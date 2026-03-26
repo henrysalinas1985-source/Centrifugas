@@ -118,6 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function init() {
         try {
             await initDB();
+            await syncOfficialData();
             await loadSavedData();
             setupEventListeners();
             loadTemplates();
@@ -242,6 +243,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('exportBackupBtn').addEventListener('click', async () => {
         try {
             const backup = { version: 1, exportDate: new Date().toISOString(), calibrations: {}, templates: [] };
+            
+            // Incluir el lastExcel (Relevamiento base de la tabla)
+            const appDataTx = db.transaction('appData', 'readonly');
+            const lastExcel = await new Promise(r => { const q = appDataTx.objectStore('appData').get('lastExcel'); q.onsuccess = () => r(q.result); });
+            if (lastExcel) backup.lastExcel = lastExcel;
+
             const calTx = db.transaction('calibrations', 'readonly');
             const allCals = await new Promise(r => { const q = calTx.objectStore('calibrations').getAll(); q.onsuccess = () => r(q.result); });
             for (const cal of allCals) {
@@ -273,6 +280,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const backup = JSON.parse(await file.text());
             if (!backup.version || !backup.calibrations) throw new Error('Formato inválido');
             const count = { cals: 0, tmpls: 0 };
+            
+            if (backup.lastExcel) {
+                db.transaction('appData', 'readwrite').objectStore('appData').put(backup.lastExcel);
+            }
+
             const calStore = db.transaction('calibrations', 'readwrite').objectStore('calibrations');
             for (const [serie, cal] of Object.entries(backup.calibrations)) {
                 const entry = { ...cal, serie };
@@ -292,6 +304,53 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) { console.error(err); alert('Error al importar: ' + err.message); }
         e.target.value = '';
     });
+
+    // === CLOUD SYNC ===
+    async function syncOfficialData() {
+        try {
+            const resp = await fetch('datos_oficiales.json', { cache: 'no-store' });
+            if (!resp.ok) return; // Si no está en el servidor, ignoramos.
+            const backup = await resp.json();
+            if (!backup.version) return;
+
+            // Revisamos si ya sincronizamos exactamente ESTE archivo (por fecha/hora)
+            const appDataTx = db.transaction('appData', 'readonly');
+            const lastSync = await new Promise(r => { const q = appDataTx.objectStore('appData').get('lastSyncDate'); q.onsuccess = () => r(q.result); });
+            
+            if (lastSync && lastSync.date === backup.exportDate) {
+                return; // Ya fue absorbido previamente, no pisar cambios locales.
+            }
+
+            if (backup.lastExcel) {
+                db.transaction('appData', 'readwrite').objectStore('appData').put(backup.lastExcel);
+            }
+
+            const calStore = db.transaction('calibrations', 'readwrite').objectStore('calibrations');
+            for (const [serie, cal] of Object.entries(backup.calibrations)) {
+                const entry = { ...cal, serie };
+                if (entry._certBase64) { entry.certificate = base64ToBlob(entry._certBase64); delete entry._certBase64; }
+                calStore.put(entry);
+            }
+
+            if (backup.templates?.length > 0) {
+                const txTmpl = db.transaction('templates', 'readwrite');
+                // Borramos las plantillas viejas al sincronizar desde la nube
+                txTmpl.objectStore('templates').clear();
+                const tmplStore = txTmpl.objectStore('templates');
+                for (const tmpl of backup.templates) {
+                    const entry = { ...tmpl }; delete entry.id;
+                    if (entry._blobBase64) { entry.blob = base64ToBlob(entry._blobBase64); delete entry._blobBase64; }
+                    tmplStore.add(entry);
+                }
+            }
+
+            // Marcar la nube como sincronizada
+            db.transaction('appData', 'readwrite').objectStore('appData').put({ id: 'lastSyncDate', date: backup.exportDate });
+            console.log("✅ Datos Oficiales sincronizados desde la nube con éxito.");
+        } catch (err) {
+            console.warn("Sincronización en la nube omitida: ", err);
+        }
+    }
 
     // === TABLA ===
     async function renderTable() {
