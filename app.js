@@ -11,59 +11,59 @@ document.addEventListener('DOMContentLoaded', () => {
     // === SCHEMA EXACTO DEL EXCEL 2025-MP CEN ===
     // 8.1 Test de Inspección y Funcionalidad — 14 ítems, filas 24-37
     const SCHEMA_81 = [
-        { code: '8.1.1', label: 'Chasis', row: 24 },
-        { code: '8.1.2', label: 'Montajes y Apoyos', row: 25 },
-        { code: '8.1.3', label: 'Enchufe de Red y Base de Enchufe', row: 26 },
-        { code: '8.1.4', label: 'Cable de Red', row: 27 },
-        { code: '8.1.5', label: 'Amarres contra tirones', row: 28 },
-        { code: '8.1.6', label: 'Interruptores y Fusibles', row: 29 },
-        { code: '8.1.7', label: 'Controles y Teclas', row: 30 },
-        { code: '8.1.8', label: 'Motor, Rotor y Bomba', row: 31 },
-        { code: '8.1.9', label: 'Indicadores y Displays', row: 32 },
-        { code: '8.1.10', label: 'Alarmas y Dispositivos para cortar la corriente', row: 33 },
-        { code: '8.1.11', label: 'Señales audibles', row: 34 },
-        { code: '8.1.12', label: 'Etiquetado', row: 35 },
-        { code: '8.1.13', label: 'Accesorios', row: 36 },
-        { code: '8.1.14', label: 'Frenos', row: 37 },
+        { code: '8.1.1', label: 'Chasis', row: 27 },
+        { code: '8.1.2', label: 'Montajes y Apoyos', row: 28 },
+        { code: '8.1.3', label: 'Enchufe de Red y Base de Enchufe', row: 29 },
+        { code: '8.1.4', label: 'Cable de Red', row: 30 },
+        { code: '8.1.5', label: 'Amarres contra tirones', row: 31 },
+        { code: '8.1.6', label: 'Interruptores y Fusibles', row: 32 },
+        { code: '8.1.7', label: 'Controles y Teclas', row: 33 },
+        { code: '8.1.8', label: 'Motor, Rotor y Bomba', row: 34 },
+        { code: '8.1.9', label: 'Indicadores y Displays', row: 35 },
+        { code: '8.1.10', label: 'Alarmas y Dispositivos para cortar la corriente', row: 36 },
+        { code: '8.1.11', label: 'Señales audibles', row: 37 },
+        { code: '8.1.12', label: 'Etiquetado', row: 38 },
+        { code: '8.1.13', label: 'Accesorios', row: 39 },
+        { code: '8.1.14', label: 'Frenos', row: 40 },
     ];
 
     // 8.2 Test Cuantitativos — Seteado/Medido/P-F
     const SCHEMA_82 = [
         {
-            code: '8.2.1', label: 'Exactitud de la Temperatura (Valor Aceptable +/- 3°C)',
-            unit: '°C', readings: 1, row: 40,
+            code: '2.2.1', label: 'Exactitud de la Temperatura (Valor Aceptable +/- 3°C)',
+            unit: '°C', readings: 1, row: 43,
         },
         {
-            code: '8.2.2', label: 'Exactitud del Tiempo (Valor Aceptable +/- 10 %)',
-            unit: 'segundos', readings: 1, row: 43,
+            code: '2.2.2', label: 'Exactitud del Tiempo (Valor Aceptable +/- 10 %)',
+            unit: 'segundos', readings: 1, row: 45,
         },
         {
-            code: '8.2.3', label: 'Exactitud de la Velocidad (Valor Aceptable +/- 10 %)',
-            unit: 'rpm', readings: 2, row: 45,
+            code: '2.2.3', label: 'Exactitud de la Velocidad (Valor Aceptable +/- 10 %)',
+            unit: 'rpm', readings: 2, row: 48,
             readingLabels: ['2000 RPM', '3500 RPM'],
         },
     ];
 
     // 8.3 Mantenimiento Preventivo — 6 ítems
     const SCHEMA_83 = [
-        { code: '8.3.1', label: 'Limpieza Exterior', row: 51 },
-        { code: '8.3.2', label: 'Lubricación', row: 52 },
-        { code: '8.3.3', label: 'Sustitución de escobillas, frenos, juntas de estanqueidad y de cierre', row: 53 },
-        { code: '8.3.4', label: 'Grupo de frío', row: 54 },
-        { code: '8.3.5', label: 'Placas electrónicas y conectores', row: 55 },
-        { code: '8.3.6', label: 'Test de Seguridad Eléctrica', row: 56 },
+        { code: '8.3.1', label: 'Limpieza Exterior', row: 54 },
+        { code: '8.3.2', label: 'Lubricación', row: 55 },
+        { code: '8.3.3', label: 'Sustitución de escobillas, frenos, juntas de estanqueidad y de cierre', row: 56 },
+        { code: '8.3.4', label: 'Grupo de frío', row: 57 },
+        { code: '8.3.5', label: 'Placas electrónicas y conectores', row: 58 },
+        { code: '8.3.6', label: 'Test de Seguridad Eléctrica', row: 59 },
     ];
 
     // 8.4 Test de Aceptación — 1 ítem
     const SCHEMA_84 = [
-        { code: '8.4.1', label: 'Seguridad de puertas', row: 59 },
+        { code: '8.4.1', label: 'Seguridad de puertas', row: 62 },
     ];
 
     // Estado de Valoración — 3 ítems
     const EVALUATION_SCHEMA = [
-        { label: 'Inspección superada, el equipo es apto para el uso', row: 15 },
-        { label: 'El equipo ha necesitado reparación', row: 16 },
-        { label: 'El equipo no está reparado. No se puede usar', row: 17 },
+        { label: 'Inspección superada, el equipo es apto para el uso', row: 18 },
+        { label: 'El equipo ha necesitado reparación', row: 19 },
+        { label: 'El equipo no está reparado. No se puede usar', row: 20 },
     ];
 
     const DB_NAME = 'CalibracionesDB_Centrifugas_v1';
@@ -390,7 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addSectionHeader(container, '8.2 Test Cuantitativos');
         addSubLabel(container, 'Ingresar valores Seteado y Medido, marcar P o F');
 
-        SCHEMA_82.forEach(test => {
+SCHEMA_82.forEach(test => {
             const savedTest = saved[`_quant_${test.code}`] || {};
             const testDiv = document.createElement('div');
             testDiv.className = 'quant-test-block';
@@ -399,18 +399,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let readingsHtml = '';
             for (let i = 0; i < test.readings; i++) {
-                const sVal = escapeHtml(savedTest[`set${i}`] || '');
+                // Pre-rellenado inteligente para Velocidad si está vacío (2000, 3500)
+                let sVal = savedTest[`set${i}`];
+                if (!sVal && test.code === '2.2.3') {
+                    sVal = (i === 0) ? '2000' : '3500';
+                }
+                sVal = escapeHtml(sVal || '');
+                
                 const mVal = escapeHtml(savedTest[`med${i}`] || '');
                 const pf = savedTest[`pf${i}`] || 'na';
                 const rLabel = test.readingLabels ? test.readingLabels[i] : '';
                 const suffix = rLabel ? ` (${rLabel})` : (test.readings > 1 ? ` ${i + 1}` : '');
+                
                 readingsHtml += `
                     <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-bottom:4px;background:#2a2a4a;padding:6px;border-radius:4px;align-items:center;">
                         <div class="field-group"><label>Seteado${suffix}</label><input type="number" step="any" class="q-set" data-idx="${i}" value="${sVal}"></div>
                         <div class="field-group"><label>Medido${suffix}</label><input type="number" step="any" class="q-med" data-idx="${i}" value="${mVal}"></div>
                         <div class="inspection-options" data-idx="${i}" style="display:flex;gap:4px;min-width:80px;">
                             <div class="inspection-opt ${pf === 'P' ? 'selected' : ''}" data-val="P" style="padding:4px 8px;cursor:pointer;border-radius:4px;">P</div>
-                            <div class="inspection-opt ${pf === 'F' ? 'selected' : ''}" data-val="F" style="padding:4px 8px;cursor:pointer;border-radius:4px;background:${pf === 'F' ? '#e53e3e' : ''}">F</div>
+                            <div class="inspection-opt ${pf === 'F' ? 'selected' : ''}" data-val="F" style="padding:4px 8px;cursor:pointer;border-radius:4px;">F</div>
                             <div class="inspection-opt ${pf === 'na' ? 'selected' : ''}" data-val="na" style="padding:4px 8px;cursor:pointer;border-radius:4px;">NA</div>
                         </div>
                     </div>`;
@@ -424,16 +431,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${readingsHtml}
             `;
 
-            // Wire P/F/NA clicks
+            // Wire P/F/NA clicks (Limpiado de estilos inline, ahora usa CSS)
             testDiv.querySelectorAll('.inspection-options').forEach(group => {
                 group.querySelectorAll('.inspection-opt').forEach(opt => {
                     opt.onclick = () => {
-                        group.querySelectorAll('.inspection-opt').forEach(o => {
-                            o.classList.remove('selected');
-                            if (o.dataset.val === 'F') o.style.background = '';
-                        });
+                        group.querySelectorAll('.inspection-opt').forEach(o => o.classList.remove('selected'));
                         opt.classList.add('selected');
-                        if (opt.dataset.val === 'F') opt.style.background = '#e53e3e';
                     };
                 });
             });
@@ -742,9 +745,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const setVal = safeParseFloat(td[`set${i}`]);
                 const medVal = safeParseFloat(td[`med${i}`]);
                 const pfVal = td[`pf${i}`] || 'N/A';
-                if (setVal !== null) ws.getCell(`G${rowOffset}`).value = setVal;
-                if (medVal !== null) ws.getCell(`H${rowOffset}`).value = medVal;
-                ws.getCell(`I${rowOffset}`).value = pfVal === 'P' ? 'P' : (pfVal === 'F' ? 'F' : 'N/A');
+                if (setVal !== null) ws.getCell(`H${rowOffset}`).value = setVal;
+                if (medVal !== null) ws.getCell(`I${rowOffset}`).value = medVal;
+                ws.getCell(`J${rowOffset}`).value = pfVal === 'P' ? 'P' : (pfVal === 'F' ? 'F' : 'N/A');
             }
         });
 

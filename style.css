@@ -490,17 +490,20 @@ th {
     color: #fff;
 }
 
-.inspection-opt.selected[data-val="si"] {
+.inspection-opt.selected[data-val="si"],
+.inspection-opt.selected[data-val="P"] {
     background: var(--success);
     color: #000;
 }
 
-.inspection-opt.selected[data-val="no"] {
+.inspection-opt.selected[data-val="no"],
+.inspection-opt.selected[data-val="F"] {
     background: var(--danger);
     color: #fff;
 }
 
-.inspection-opt.selected[data-val="na"] {
+.inspection-opt.selected[data-val="na"],
+.inspection-opt.selected[data-val="NA"] {
     background: #555;
     color: #fff;
 }
