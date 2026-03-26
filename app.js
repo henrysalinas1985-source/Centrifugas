@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let instrumentsBank = [];
     let savedTemplates = [];
     let selectedSerieForEdit = null;
+    let hiddenSeries = [];
 
     // === SCHEMA EXACTO DEL EXCEL 2025-MP CEN ===
     // 8.1 Test de Inspección y Funcionalidad — 14 ítems, filas 24-37
@@ -106,6 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const certFileInput = document.getElementById('certFileInput');
     const certStatus = document.getElementById('certStatus');
     const templateSelector = document.getElementById('templateSelector');
+    const deleteTemplateBtn = document.getElementById('deleteTemplateBtn');
     const templateNameInput = document.getElementById('templateNameInput');
     const saveNewTemplateBtn = document.getElementById('saveNewTemplateBtn');
     const saveTemplateRow = document.getElementById('saveTemplateRow');
@@ -207,6 +209,8 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadSavedData() {
         const tx = db.transaction('appData', 'readonly');
         const last = await new Promise(r => { const q = tx.objectStore('appData').get('lastExcel'); q.onsuccess = () => r(q.result); });
+        const hd = await new Promise(r => { const q = tx.objectStore('appData').get('hiddenSeries'); q.onsuccess = () => r(q.result); });
+        if (hd && hd.list) hiddenSeries = hd.list;
         if (!last) return;
         allSheetsData = last.allSheetsData; currentClinic = last.currentClinic;
         sheetSelector.innerHTML = '';
@@ -242,7 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('exportBackupBtn').addEventListener('click', async () => {
         try {
-            const backup = { version: 1, exportDate: new Date().toISOString(), calibrations: {}, templates: [] };
+            const backup = { version: 1, exportDate: new Date().toISOString(), calibrations: {}, templates: [], hiddenSeries };
             
             // Incluir el lastExcel (Relevamiento base de la tabla)
             const appDataTx = db.transaction('appData', 'readonly');
@@ -265,10 +269,26 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const json = JSON.stringify(backup, null, 2);
             const blob = new Blob([json], { type: 'application/json' });
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-            a.download = `backup_centrifugas_${new Date().toISOString().slice(0, 10)}.json`;
-            a.click(); URL.revokeObjectURL(a.href);
-            alert('✅ Backup exportado correctamente.');
+            
+            if (window.showSaveFilePicker) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: 'datos_oficiales.json',
+                        types: [{ description: 'JSON File', accept: { 'application/json': ['.json'] } }],
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                    alert('✅ Backup exportado correctamente.');
+                } catch (e) {
+                    if (e.name !== 'AbortError') throw e;
+                }
+            } else {
+                const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+                a.download = 'datos_oficiales.json';
+                a.click(); URL.revokeObjectURL(a.href);
+                alert('✅ Backup exportado correctamente.');
+            }
         } catch (err) { console.error(err); alert('Error al exportar: ' + err.message); }
     });
 
@@ -283,6 +303,9 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (backup.lastExcel) {
                 db.transaction('appData', 'readwrite').objectStore('appData').put(backup.lastExcel);
+            }
+            if (backup.hiddenSeries) {
+                db.transaction('appData', 'readwrite').objectStore('appData').put({ id: 'hiddenSeries', list: backup.hiddenSeries });
             }
 
             const calStore = db.transaction('calibrations', 'readwrite').objectStore('calibrations');
@@ -308,8 +331,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // === CLOUD SYNC ===
     async function syncOfficialData() {
         try {
-            const resp = await fetch('datos_oficiales.json', { cache: 'no-store' });
-            if (!resp.ok) return; // Si no está en el servidor, ignoramos.
+            let resp = await fetch('datos_oficiales.json', { cache: 'no-store' });
+            if (!resp.ok) {
+                // Fallback por si Windows duplicó la extensión al renombrarlo
+                resp = await fetch('datos_oficiales.json.json', { cache: 'no-store' });
+                if (!resp.ok) return;
+            }
             const backup = await resp.json();
             if (!backup.version) return;
 
@@ -323,6 +350,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (backup.lastExcel) {
                 db.transaction('appData', 'readwrite').objectStore('appData').put(backup.lastExcel);
+            }
+            if (backup.hiddenSeries) {
+                db.transaction('appData', 'readwrite').objectStore('appData').put({ id: 'hiddenSeries', list: backup.hiddenSeries });
+                hiddenSeries = backup.hiddenSeries;
             }
 
             const calStore = db.transaction('calibrations', 'readwrite').objectStore('calibrations');
@@ -367,6 +398,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const nombreKey = keys.find(k => k.toLowerCase().includes('equipo') || k.toLowerCase().includes('nombre') || k.toLowerCase().includes('ubicacion') || k.toLowerCase().includes('ubicación'));
             const serie = String(row[serieKey] || '').toUpperCase().trim();
             if (!serie || serie === '') return;
+            if (hiddenSeries.includes(serie)) return;
             if (search && !serie.includes(search)) return;
 
             stats.total++;
@@ -387,7 +419,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${escapeHtml(cal?.technician || '-')}</td>
                 <td>${cal?.certificate ? `<button class="btn btn-small" data-action="viewCert" data-serie="${safeSerie}">📄</button>` : '-'}</td>
                 <td><span class="status-badge ${status.class}">${escapeHtml(status.text)}</span></td>
-                <td><button class="btn btn-secondary btn-small" data-action="openEdit" data-serie="${safeSerie}">📅 Registrar</button></td>
+                <td style="display:flex; gap:5px;">
+                    <button class="btn btn-secondary btn-small" data-action="openEdit" data-serie="${safeSerie}">📅</button>
+                    <button class="btn btn-danger btn-small" data-action="hideEquipment" data-serie="${safeSerie}" title="Eliminar/Ocultar Equipo">🗑️</button>
+                </td>
             `;
             equiposTableBody.appendChild(tr);
         });
@@ -604,6 +639,29 @@ SCHEMA_82.forEach(test => {
         sheetSelector.addEventListener('change', e => { currentClinic = e.target.value; renderTable(); });
         serieFilter.addEventListener('input', renderTable);
 
+        templateSelector.addEventListener('change', e => {
+            const val = e.target.value;
+            if (deleteTemplateBtn) {
+                // Show delete button only if a template is selected (custom templates have numeric IDs)
+                if (val && !isNaN(Number(val)) && (typeof FIXED_DATA_TEMPLATES === 'undefined' || !FIXED_DATA_TEMPLATES[val])) {
+                    deleteTemplateBtn.classList.remove('hidden');
+                } else {
+                    deleteTemplateBtn.classList.add('hidden');
+                }
+            }
+            // The following logic was incorrectly placed here in the provided edit.
+            // It seems to belong to certFileInput.addEventListener or a related template application logic.
+            // Keeping it commented out or removed as it refers to an undefined 'file' variable.
+            // if (!val) return;
+            // const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+            // saveTemplateRow.classList.toggle('hidden', !isExcel);
+            // if (isExcel) {
+            //     try {
+            //         const extracted = await extractInstrumentsFromExcel(file);
+            //     } catch (err) { console.error("Error extracción:", err); }
+            // }
+        });
+
         certFileInput.addEventListener('change', async e => {
             const file = e.target.files[0]; if (!file) return;
             const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
@@ -636,15 +694,72 @@ SCHEMA_82.forEach(test => {
             tx.oncomplete = () => { alert('Plantilla guardada'); templateNameInput.value = ''; saveTemplateRow.classList.add('hidden'); loadTemplates(); };
         });
 
+        if (deleteTemplateBtn) {
+            deleteTemplateBtn.addEventListener('click', async () => {
+                const val = templateSelector.value;
+                if (!val || isNaN(Number(val))) return;
+                
+                const templateName = templateSelector.options[templateSelector.selectedIndex].text;
+                if (!confirm(`¿Estás seguro de que deseas eliminar permanentemente la plantilla "${templateName}"?`)) return;
+                
+                try {
+                    const tx = db.transaction('templates', 'readwrite');
+                    tx.objectStore('templates').delete(Number(val));
+                    tx.oncomplete = () => {
+                        alert(`✅ Plantilla "${templateName}" eliminada correctamente.`);
+                        loadTemplates();
+                        deleteTemplateBtn.classList.add('hidden');
+                    };
+                } catch (err) {
+                    console.error('Error al eliminar plantilla:', err);
+                    alert('Error al eliminar plantilla: ' + err.message);
+                }
+            });
+        }
+
         document.getElementById('closeModalBtn').onclick = () => editModal.classList.add('hidden');
 
-        equiposTableBody.addEventListener('click', e => {
+        equiposTableBody.addEventListener('click', async e => {
             const btn = e.target.closest('[data-action]');
             if (!btn) return;
             const serie = btn.dataset.serie;
+            
+            if (btn.dataset.action === 'hideEquipment') {
+                if (confirm(`¿Estás seguro de que deseas eliminar permanentemente el equipo con serie "${serie}" de la interfaz?`)) {
+                    hiddenSeries.push(serie);
+                    const tx = db.transaction('appData', 'readwrite');
+                    tx.objectStore('appData').put({ id: 'hiddenSeries', list: hiddenSeries });
+                    tx.oncomplete = () => renderTable();
+                }
+                return;
+            }
+            
             if (btn.dataset.action === 'viewCert') {
                 const c = calibrationDates[serie];
-                if (c?.certificate) window.open(URL.createObjectURL(c.certificate), '_blank');
+                if (c?.certificate) {
+                    const isExcel = c.certName && (c.certName.endsWith('.xlsx') || c.certName.endsWith('.xls'));
+                    if (window.showSaveFilePicker) {
+                        try {
+                            const handle = await window.showSaveFilePicker({
+                                suggestedName: c.certName || `Certificado_${serie}.${isExcel ? 'xlsx' : 'pdf'}`,
+                                types: [{
+                                    description: isExcel ? 'Excel Document' : 'PDF Document',
+                                    accept: isExcel ? { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } : { 'application/pdf': ['.pdf'] }
+                                }]
+                            });
+                            const writable = await handle.createWritable();
+                            await writable.write(c.certificate);
+                            await writable.close();
+                        } catch (err) {
+                            if (err.name !== 'AbortError') window.open(URL.createObjectURL(c.certificate), '_blank');
+                        }
+                    } else {
+                        const a = document.createElement('a');
+                        a.href = URL.createObjectURL(c.certificate);
+                        a.download = c.certName || `Certificado_${serie}.${isExcel ? 'xlsx' : 'pdf'}`;
+                        a.click();
+                    }
+                }
             } else if (btn.dataset.action === 'openEdit') {
                 openEditModal(serie);
             }
