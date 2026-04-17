@@ -244,6 +244,69 @@ document.addEventListener('DOMContentLoaded', () => {
         return new Blob([arr], { type: mime });
     }
 
+    const modalExcelOverlay = document.getElementById('modalExcelOverlay');
+    const excelFilenameInput = document.getElementById('excelFilename');
+    const excelClinicSelector = document.getElementById('excelClinicSelector');
+    const excelConfirmBtn = document.getElementById('excelConfirmBtn');
+    const excelCancelBtn = document.getElementById('excelCancelBtn');
+
+    document.getElementById('exportExcelBtn').addEventListener('click', () => {
+        excelFilenameInput.value = `Reporte_Centrifugas_${new Date().toISOString().split('T')[0]}`;
+        modalExcelOverlay.classList.remove('hidden');
+    });
+
+    excelCancelBtn.onclick = () => modalExcelOverlay.classList.add('hidden');
+
+    excelConfirmBtn.onclick = () => {
+        const mode = excelClinicSelector.value;
+        const wb = XLSX.utils.book_new();
+
+        const processRows = (rows, sheetName) => {
+            if (!rows || rows.length === 0) return null;
+            const exportData = rows.map(row => {
+                const keys = Object.keys(row);
+                const serieKey = keys.find(k => k.toLowerCase().includes('serie') || k.toLowerCase().includes('n°') || k.toLowerCase().includes('sensor'));
+                const nombreKey = keys.find(k => k.toLowerCase().includes('equipo') || k.toLowerCase().includes('nombre') || k.toLowerCase().includes('ubicacion') || k.toLowerCase().includes('ubicación'));
+                
+                const serie = String(row[serieKey] || '').toUpperCase().trim();
+                const cal = calibrationDates[serie] || null;
+                const status = getStatus(cal?.date);
+                
+                const displayName = cal?.editedName || (nombreKey ? row[nombreKey] : 'N/A');
+                const displaySerie = cal?.editedSerie || serie;
+
+                return {
+                    "Equipo": displayName,
+                    "N° Serie": displaySerie,
+                    "Última Calibración": cal ? formatDate(cal.date) : 'Sin registrar',
+                    "Técnico": cal?.technician || '-',
+                    "Estado": status.text,
+                    "Marca": cal?.brand || (row.marca || '-'),
+                    "Modelo": cal?.model || (row.modelo || '-'),
+                    "Sector": cal?.sector || (row.sector || '-'),
+                    "Ubicación": cal?.location || (row.ubicacion || row['ubicación'] || '-')
+                };
+            });
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31));
+            return true;
+        };
+
+        if (mode === 'current') {
+            processRows(allSheetsData[currentClinic], currentClinic);
+        } else {
+            Object.keys(allSheetsData).forEach(name => {
+                processRows(allSheetsData[name], name);
+            });
+        }
+
+        let filename = excelFilenameInput.value.trim() || 'Reporte_Centrifugas';
+        if (!filename.toLowerCase().endsWith('.xlsx')) filename += '.xlsx';
+        
+        XLSX.writeFile(wb, filename);
+        modalExcelOverlay.classList.add('hidden');
+    };
+
     document.getElementById('exportBackupBtn').addEventListener('click', async () => {
         try {
             const backup = { version: 1, exportDate: new Date().toISOString(), calibrations: {}, templates: [], hiddenSeries };
@@ -737,7 +800,8 @@ SCHEMA_82.forEach(test => {
             if (btn.dataset.action === 'viewCert') {
                 const c = calibrationDates[serie];
                 if (c?.certificate) {
-                    const isExcel = c.certName && (c.certName.endsWith('.xlsx') || c.certName.endsWith('.xls'));
+                    const isExcel = (c.certName && (c.certName.endsWith('.xlsx') || c.certName.endsWith('.xls'))) || 
+                                   (c.certificate.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
                     if (window.showSaveFilePicker) {
                         try {
                             const handle = await window.showSaveFilePicker({
@@ -850,6 +914,8 @@ SCHEMA_82.forEach(test => {
                     });
                 }
 
+                const finalCertName = finalCert?.name || blob?.name || (blob ? `Certificado_${selectedSerieForEdit}.xlsx` : '');
+
                 await storeCalibration({
                     serie: selectedSerieForEdit, date: calibDateInput.value,
                     technician: technicianInput.value, ordenM: ordenMInput.value,
@@ -858,7 +924,7 @@ SCHEMA_82.forEach(test => {
                     model: modelInput.value, comments: commentsInput.value,
                     editedName: equipmentNameInput.value, editedSerie: modalSerieInput.value,
                     instruments, inspections, evaluations,
-                    certificate: finalCert, certName: finalCert?.name,
+                    certificate: finalCert, certName: finalCertName,
                 });
                 editModal.classList.add('hidden');
                 renderTable();

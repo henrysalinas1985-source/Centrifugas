@@ -28,6 +28,7 @@
             </div>
             <div class="btn-row hidden" id="configActions">
                 <button id="clearDataBtn" class="btn btn-danger">🗑️ Borrar Datos</button>
+                <button id="exportExcelBtn" class="btn btn-secondary">📊 Exportar Excel</button>
                 <button id="exportBackupBtn" class="btn btn-secondary">📦 Exportar Backup</button>
                 <button id="importBackupBtn" class="btn btn-secondary">📥 Importar Backup</button>
                 <input type="file" id="importBackupFile" accept=".json" style="display:none">
@@ -182,6 +183,34 @@
                     <button id="resetCalibBtn" class="btn btn-danger">Resetear Equipo</button>
                     <button id="closeModalBtn" class="btn btn-secondary">Cerrar</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Excel Export Modal -->
+    <div id="modalExcelOverlay" class="modal-overlay hidden">
+        <div class="modal" style="max-width: 450px;">
+            <h3 style="margin-top: 0;">Exportar a Excel</h3>
+            <p style="color: var(--text-dim); margin-bottom: 20px; text-align: center; font-size: 0.9rem;">
+                Configura las opciones de descarga para tu reporte.
+            </p>
+            
+            <div class="input-group">
+                <label for="excelFilename">Nombre de Archivo</label>
+                <input type="text" id="excelFilename" placeholder="Ej: Reporte_Centrifugas_2024">
+            </div>
+
+            <div class="input-group" style="background: rgba(255,255,255,0.03); padding: 15px; border-radius: 12px; border: 1px solid var(--border);">
+                <label style="display: block; margin-bottom: 15px; font-weight: 700; font-size: 0.7rem;">FILTRAR POR CLÍNICA:</label>
+                <select id="excelClinicSelector" class="filter-select" style="margin-top: 0;">
+                    <option value="current">Clínica Actual (Hoja)</option>
+                    <option value="all">Todas las Clínicas (Libro completo)</option>
+                </select>
+            </div>
+
+            <div class="btn-row" style="margin-top: 25px;">
+                <button type="button" class="btn btn-secondary" id="excelCancelBtn" style="flex:1">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="excelConfirmBtn" style="flex:2">Generar Excel</button>
             </div>
         </div>
     </div>
