@@ -543,13 +543,104 @@ th {
     border-color: var(--accent);
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+
+    h1 {
+        font-size: 1.5rem;
+    }
 
     .filters-grid,
-    .summary-card,
-    .input-grid,
+    .summary-card {
+        grid-template-columns: 1fr;
+    }
+
+    .btn-row {
+        flex-direction: column;
+    }
+
+    .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* === Table to Cards Transformation === */
+    .table-container {
+        overflow-x: hidden;
+    }
+
+    table, thead, tbody, th, td, tr {
+        display: block;
+        width: 100%;
+    }
+
+    thead tr {
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+    }
+
+    tr {
+        margin-bottom: 20px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    td {
+        border: none;
+        border-bottom: 1px solid var(--border);
+        position: relative;
+        padding-left: 45% !important;
+        text-align: right !important;
+        min-height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+    }
+
+    td::before {
+        content: attr(data-label);
+        position: absolute;
+        left: 15px;
+        width: 40%;
+        padding-right: 10px;
+        white-space: nowrap;
+        text-align: left;
+        font-weight: 700;
+        color: var(--accent);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+    }
+
+    td:last-child {
+        border-bottom: none;
+        background: rgba(0, 0, 0, 0.2);
+        padding-left: 15px !important;
+        justify-content: center;
+    }
+
+    td[data-label="Acciones"]::before {
+        display: none;
+    }
+
+    /* Modal adjustments */
+    .modal {
+        padding: 20px;
+        max-height: 95vh;
+        overflow-y: auto;
+    }
+
+    .input-grid {
+        grid-template-columns: 1fr;
+    }
+
     .instrument-item {
         grid-template-columns: 1fr;
+        padding: 15px;
     }
 
     .instrument-item .full-width {

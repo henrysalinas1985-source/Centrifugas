@@ -115,6 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const totalEquiposEl = document.getElementById('totalEquipos').querySelector('.val');
     const cercaVencerEl = document.getElementById('cercaVencer').querySelector('.val');
     const vencidosEl = document.getElementById('vencidos').querySelector('.val');
+    const addEquipmentBtn = document.getElementById('addEquipmentBtn');
 
     // === INIT ===
     async function init() {
@@ -263,7 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const processRows = (rows, sheetName) => {
             if (!rows || rows.length === 0) return null;
-            const exportData = rows.map(row => {
+            const excelEntries = rows.map(row => {
                 const keys = Object.keys(row);
                 const serieKey = keys.find(k => k.toLowerCase().includes('serie') || k.toLowerCase().includes('n°') || k.toLowerCase().includes('sensor'));
                 const nombreKey = keys.find(k => k.toLowerCase().includes('equipo') || k.toLowerCase().includes('nombre') || k.toLowerCase().includes('ubicacion') || k.toLowerCase().includes('ubicación'));
@@ -274,17 +275,38 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const displayName = cal?.editedName || (nombreKey ? row[nombreKey] : 'N/A');
                 const displaySerie = cal?.editedSerie || serie;
+                return { serie, displayName, displaySerie, status, cal, row };
+            });
 
+            // 2. Add manual entries from calibrationDates that are not in Excel
+            const renderedSeries = new Set(excelEntries.map(e => e.serie));
+            const manualEntries = Object.values(calibrationDates)
+                .filter(cal => !renderedSeries.has(cal.serie) && (cal.sector === sheetName))
+                .map(cal => {
+                    const status = getStatus(cal.date);
+                    return {
+                        serie: cal.serie,
+                        displayName: cal.editedName || 'N/A',
+                        displaySerie: cal.editedSerie || cal.serie,
+                        status,
+                        cal,
+                        row: {}
+                    };
+                });
+
+            const allEntries = [...excelEntries, ...manualEntries];
+
+            const exportData = allEntries.map(e => {
                 return {
-                    "Equipo": displayName,
-                    "N° Serie": displaySerie,
-                    "Última Calibración": cal ? formatDate(cal.date) : 'Sin registrar',
-                    "Técnico": cal?.technician || '-',
-                    "Estado": status.text,
-                    "Marca": cal?.brand || (row.marca || '-'),
-                    "Modelo": cal?.model || (row.modelo || '-'),
-                    "Sector": cal?.sector || (row.sector || '-'),
-                    "Ubicación": cal?.location || (row.ubicacion || row['ubicación'] || '-')
+                    "Equipo": e.displayName,
+                    "N° Serie": e.displaySerie,
+                    "Última Calibración": e.cal ? formatDate(e.cal.date) : 'Sin registrar',
+                    "Técnico": e.cal?.technician || '-',
+                    "Estado": e.status.text,
+                    "Marca": e.cal?.brand || (e.row.marca || '-'),
+                    "Modelo": e.cal?.model || (e.row.modelo || '-'),
+                    "Sector": e.cal?.sector || (e.row.sector || '-'),
+                    "Ubicación": e.cal?.location || (e.row.ubicacion || e.row['ubicación'] || '-')
                 };
             });
             const ws = XLSX.utils.json_to_sheet(exportData);
@@ -450,12 +472,33 @@ document.addEventListener('DOMContentLoaded', () => {
     async function renderTable() {
         if (!currentClinic || !allSheetsData[currentClinic]) return;
         await getAllCalibrations();
-        const rows = allSheetsData[currentClinic];
+        const excelRows = allSheetsData[currentClinic];
         const search = serieFilter.value.trim().toUpperCase();
         equiposTableBody.innerHTML = '';
         let stats = { total: 0, warn: 0, danger: 0 };
+        const renderedSeries = new Set();
 
-        rows.forEach(row => {
+        const renderRow = (displayName, displaySerie, cal, status, originalSerie) => {
+            const safeSerie = escapeHtml(originalSerie);
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td data-label="Equipo">${escapeHtml(String(displayName))}</td>
+                <td data-label="N° Serie">${escapeHtml(String(displaySerie))}</td>
+                <td data-label="Calibración">${cal ? formatDate(cal.date) : '<span style="color:#aaa">Sin registrar</span>'}</td>
+                <td data-label="Técnico">${escapeHtml(cal?.technician || '-')}</td>
+                <td data-label="Cert.">${cal?.certificate ? `<button class="btn btn-small" data-action="viewCert" data-serie="${safeSerie}">📄</button>` : '-'}</td>
+                <td data-label="Estado"><span class="status-badge ${status.class}">${escapeHtml(status.text)}</span></td>
+                <td data-label="Acciones" style="display:flex; gap:5px; justify-content: flex-end;">
+                    <button class="btn btn-secondary btn-small" data-action="openEdit" data-serie="${safeSerie}">📅</button>
+                    <button class="btn btn-danger btn-small" data-action="hideEquipment" data-serie="${safeSerie}" title="Eliminar/Ocultar Equipo">🗑️</button>
+                </td>
+            `;
+            equiposTableBody.appendChild(tr);
+            renderedSeries.add(originalSerie.toUpperCase());
+        };
+
+        // 1. Mostrar filas del Excel
+        excelRows.forEach(row => {
             const keys = Object.keys(row);
             const serieKey = keys.find(k => k.toLowerCase().includes('serie') || k.toLowerCase().includes('n°') || k.toLowerCase().includes('sensor'));
             const nombreKey = keys.find(k => k.toLowerCase().includes('equipo') || k.toLowerCase().includes('nombre') || k.toLowerCase().includes('ubicacion') || k.toLowerCase().includes('ubicación'));
@@ -472,22 +515,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const displayName = cal?.editedName || (nombreKey ? row[nombreKey] : 'N/A');
             const displaySerie = cal?.editedSerie || serie;
-            const safeSerie = escapeHtml(serie);
+            
+            renderRow(displayName, displaySerie, cal, status, serie);
+        });
 
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${escapeHtml(String(displayName))}</td>
-                <td>${escapeHtml(String(displaySerie))}</td>
-                <td>${cal ? formatDate(cal.date) : '<span style="color:#aaa">Sin registrar</span>'}</td>
-                <td>${escapeHtml(cal?.technician || '-')}</td>
-                <td>${cal?.certificate ? `<button class="btn btn-small" data-action="viewCert" data-serie="${safeSerie}">📄</button>` : '-'}</td>
-                <td><span class="status-badge ${status.class}">${escapeHtml(status.text)}</span></td>
-                <td style="display:flex; gap:5px;">
-                    <button class="btn btn-secondary btn-small" data-action="openEdit" data-serie="${safeSerie}">📅</button>
-                    <button class="btn btn-danger btn-small" data-action="hideEquipment" data-serie="${safeSerie}" title="Eliminar/Ocultar Equipo">🗑️</button>
-                </td>
-            `;
-            equiposTableBody.appendChild(tr);
+        // 2. Mostrar equipos manuales (que no están en el Excel actual pero pertenecen a esta clínica)
+        Object.values(calibrationDates).forEach(cal => {
+            const serie = cal.serie.toUpperCase();
+            if (renderedSeries.has(serie)) return;
+            if (hiddenSeries.includes(serie)) return;
+            if (cal.sector !== currentClinic) return; // Solo los de esta hoja
+            if (search && !serie.includes(search)) return;
+
+            stats.total++;
+            const status = getStatus(cal.date);
+            if (status.class === 'status-warning') stats.warn++;
+            if (status.class === 'status-danger') stats.danger++;
+
+            const displayName = cal.editedName || 'N/A';
+            const displaySerie = cal.editedSerie || cal.serie;
+
+            renderRow(displayName, displaySerie, cal, status, cal.serie);
         });
 
         totalEquiposEl.textContent = stats.total;
@@ -701,6 +749,7 @@ SCHEMA_82.forEach(test => {
         document.getElementById('dropZone').addEventListener('click', () => fileInput.click());
         sheetSelector.addEventListener('change', e => { currentClinic = e.target.value; renderTable(); });
         serieFilter.addEventListener('input', renderTable);
+        addEquipmentBtn.addEventListener('click', () => openEditModal(null));
 
         templateSelector.addEventListener('change', e => {
             const val = e.target.value;
@@ -831,9 +880,13 @@ SCHEMA_82.forEach(test => {
 
         function openEditModal(serie) {
             selectedSerieForEdit = serie;
-            const existing = calibrationDates[serie] || {};
-            const eqRow = (allSheetsData[currentClinic] || [])
-                .find(r => String(r[Object.keys(r).find(k => k.toLowerCase().includes('serie') || k.toLowerCase().includes('n°'))] || '').toUpperCase() === serie) || {};
+            const existing = serie ? (calibrationDates[serie] || {}) : {};
+            const eqRow = (serie && allSheetsData[currentClinic]) 
+                ? (allSheetsData[currentClinic].find(r => {
+                    const k = Object.keys(r).find(key => key.toLowerCase().includes('serie') || key.toLowerCase().includes('n°'));
+                    return String(r[k] || '').toUpperCase() === serie;
+                }) || {})
+                : {};
 
             calibDateInput.value = existing.date || '';
             ordenMInput.value = existing.ordenM || '';
@@ -842,10 +895,13 @@ SCHEMA_82.forEach(test => {
             sectorInput.value = existing.sector || eqRow.sector || '';
             locationInput.value = existing.location || eqRow.ubicacion || eqRow['ubicación'] || '';
             equipmentNameInput.value = existing.editedName || eqRow.equipo || '';
-            modalSerieInput.value = existing.editedSerie || serie;
+            modalSerieInput.value = existing.editedSerie || (serie || '');
             modelInput.value = existing.model || eqRow.modelo || '';
             brandInput.value = existing.brand || eqRow.marca || '';
             commentsInput.value = existing.comments || '';
+
+            // Habilitar/Deshabilitar serie según sea nuevo o edición
+            modalSerieInput.readOnly = false; // Siempre permitir editar si se desea corregir la serie
 
             instrumentsContainer.innerHTML = '';
             if (existing.instruments && existing.instruments.length > 0) {
@@ -892,7 +948,8 @@ SCHEMA_82.forEach(test => {
         };
 
         saveCalibBtn.onclick = async () => {
-            if (!selectedSerieForEdit) return;
+            const finalSerie = modalSerieInput.value.trim().toUpperCase();
+            if (!finalSerie) { alert('El N° de Serie es requerido'); return; }
             if (!calibDateInput.value) { alert('Fecha requerida'); return; }
             const inspections = getInspectionsData();
             const evaluations = getEvaluationsData();
@@ -914,15 +971,16 @@ SCHEMA_82.forEach(test => {
                     });
                 }
 
-                const finalCertName = finalCert?.name || blob?.name || (blob ? `Certificado_${selectedSerieForEdit}.xlsx` : '');
+                const finalCertName = finalCert?.name || blob?.name || (blob ? `Certificado_${finalSerie}.xlsx` : '');
 
                 await storeCalibration({
-                    serie: selectedSerieForEdit, date: calibDateInput.value,
+                    serie: finalSerie, date: calibDateInput.value,
                     technician: technicianInput.value, ordenM: ordenMInput.value,
-                    building: buildingInput.value, sector: sectorInput.value,
+                    building: buildingInput.value, 
+                    sector: sectorInput.value || currentClinic, // Si es nuevo, asignar clínica actual como sector
                     location: locationInput.value, brand: brandInput.value,
                     model: modelInput.value, comments: commentsInput.value,
-                    editedName: equipmentNameInput.value, editedSerie: modalSerieInput.value,
+                    editedName: equipmentNameInput.value, editedSerie: finalSerie,
                     instruments, inspections, evaluations,
                     certificate: finalCert, certName: finalCertName,
                 });
