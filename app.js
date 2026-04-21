@@ -664,6 +664,26 @@ SCHEMA_82.forEach(test => {
         });
     }
 
+    function renderEvaluations(savedEvaluations = {}) {
+        const evalContainer = document.getElementById('evaluationStatusContainer');
+        evalContainer.innerHTML = '';
+        EVALUATION_SCHEMA.forEach(item => {
+            const cur = savedEvaluations[item.label] || '';
+            const rowEl = document.createElement('div'); rowEl.className = 'inspection-row';
+            rowEl.innerHTML = `
+                <div class="inspection-label">${item.label}</div>
+                <div class="inspection-options" data-label="${item.label}" data-type="evaluation">
+                    <div class="inspection-opt ${cur === 'P' ? 'selected' : ''}" data-val="P">P</div>
+                    <div class="inspection-opt ${cur === 'NA' ? 'selected' : ''}" data-val="NA">NA</div>
+                </div>`;
+            rowEl.querySelectorAll('.inspection-opt').forEach(o => o.onclick = () => {
+                rowEl.querySelectorAll('.inspection-opt').forEach(x => x.classList.remove('selected'));
+                o.classList.add('selected');
+            });
+            evalContainer.appendChild(rowEl);
+        });
+    }
+
     function addChoiceRow(container, item, saved, section) {
         const saved_val = saved[`${section}_${item.label}`] || 'na';
         const rowEl = document.createElement('div'); rowEl.className = 'inspection-row';
@@ -751,28 +771,46 @@ SCHEMA_82.forEach(test => {
         serieFilter.addEventListener('input', renderTable);
         addEquipmentBtn.addEventListener('click', () => openEditModal(null));
 
-        templateSelector.addEventListener('change', e => {
+        templateSelector.addEventListener('change', async e => {
             const val = e.target.value;
+            if (!val) {
+                if (deleteTemplateBtn) deleteTemplateBtn.classList.add('hidden');
+                return;
+            }
+
             if (deleteTemplateBtn) {
                 // Show delete button only if a template is selected (custom templates have numeric IDs)
-                if (val && !isNaN(Number(val)) && (typeof FIXED_DATA_TEMPLATES === 'undefined' || !FIXED_DATA_TEMPLATES[val])) {
+                if (!isNaN(Number(val)) && (typeof FIXED_DATA_TEMPLATES === 'undefined' || !FIXED_DATA_TEMPLATES[val])) {
                     deleteTemplateBtn.classList.remove('hidden');
                 } else {
                     deleteTemplateBtn.classList.add('hidden');
                 }
             }
-            // The following logic was incorrectly placed here in the provided edit.
-            // It seems to belong to certFileInput.addEventListener or a related template application logic.
-            // Keeping it commented out or removed as it refers to an undefined 'file' variable.
-            // if (!val) return;
-            // const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
-            // saveTemplateRow.classList.toggle('hidden', !isExcel);
-            // if (isExcel) {
-            //     try {
-            //         const extracted = await extractInstrumentsFromExcel(file);
-            //     } catch (err) { console.error("Error extracción:", err); }
-            // }
+
+            const tmpl = savedTemplates.find(t => String(t.id) === String(val));
+            if (tmpl && tmpl.inspections) {
+                if (confirm(`La plantilla "${tmpl.name}" contiene datos de registros estándar. ¿Deseas cargar estos datos (Inspecciones e Instrumental) en el formulario actual?`)) {
+                    applyTemplateData(tmpl);
+                }
+            }
         });
+
+        function applyTemplateData(tmpl) {
+            if (tmpl.brand) brandInput.value = tmpl.brand;
+            if (tmpl.model) modelInput.value = tmpl.model;
+            if (tmpl.technician) technicianInput.value = tmpl.technician;
+            if (tmpl.building) buildingInput.value = tmpl.building;
+            if (tmpl.sector) sectorInput.value = tmpl.sector;
+            if (tmpl.location) locationInput.value = tmpl.location;
+            
+            renderInspectionPoints(tmpl.inspections || {});
+            renderEvaluations(tmpl.evaluations || {});
+
+            instrumentsContainer.innerHTML = '';
+            if (tmpl.instruments && tmpl.instruments.length > 0) {
+                tmpl.instruments.forEach(i => createInstrumentRow(i));
+            }
+        }
 
         certFileInput.addEventListener('change', async e => {
             const file = e.target.files[0]; if (!file) return;
@@ -801,9 +839,32 @@ SCHEMA_82.forEach(test => {
         saveNewTemplateBtn.addEventListener('click', async () => {
             const file = certFileInput.files[0], name = templateNameInput.value.trim();
             if (!file || !name) { alert('Falta archivo o nombre'); return; }
+            
+            const inspections = getInspectionsData();
+            const evaluations = getEvaluationsData();
+            const instruments = getInstrumentsData();
+            const brand = brandInput.value;
+            const model = modelInput.value;
+            const technician = technicianInput.value;
+            const building = buildingInput.value;
+            const sector = sectorInput.value;
+            const location = locationInput.value;
+
             const tx = db.transaction('templates', 'readwrite');
-            tx.objectStore('templates').add({ name, blob: file });
-            tx.oncomplete = () => { alert('Plantilla guardada'); templateNameInput.value = ''; saveTemplateRow.classList.add('hidden'); loadTemplates(); };
+            tx.objectStore('templates').add({ 
+                name, 
+                blob: file,
+                inspections,
+                evaluations,
+                instruments,
+                brand,
+                model,
+                technician,
+                building,
+                sector,
+                location
+            });
+            tx.oncomplete = () => { alert('Plantilla guardada con todos los registros actuales'); templateNameInput.value = ''; saveTemplateRow.classList.add('hidden'); loadTemplates(); };
         });
 
         if (deleteTemplateBtn) {
@@ -915,24 +976,7 @@ SCHEMA_82.forEach(test => {
                 }).catch(err => console.error(err));
             }
 
-            // Evaluación
-            const evalContainer = document.getElementById('evaluationStatusContainer');
-            evalContainer.innerHTML = '';
-            EVALUATION_SCHEMA.forEach(item => {
-                const cur = (existing.evaluations || {})[item.label] || '';
-                const rowEl = document.createElement('div'); rowEl.className = 'inspection-row';
-                rowEl.innerHTML = `
-                    <div class="inspection-label">${item.label}</div>
-                    <div class="inspection-options" data-label="${item.label}" data-type="evaluation">
-                        <div class="inspection-opt ${cur === 'P' ? 'selected' : ''}" data-val="P">P</div>
-                        <div class="inspection-opt ${cur === 'NA' ? 'selected' : ''}" data-val="NA">NA</div>
-                    </div>`;
-                rowEl.querySelectorAll('.inspection-opt').forEach(o => o.onclick = () => {
-                    rowEl.querySelectorAll('.inspection-opt').forEach(x => x.classList.remove('selected'));
-                    o.classList.add('selected');
-                });
-                evalContainer.appendChild(rowEl);
-            });
+            renderEvaluations(existing.evaluations || {});
 
             certStatus.textContent = existing.certName ? `Certificado: ${existing.certName}` : 'Sin certificado';
             renderInspectionPoints(existing.inspections || {});
