@@ -107,6 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const certFileInput = document.getElementById('certFileInput');
     const certStatus = document.getElementById('certStatus');
     const templateSelector = document.getElementById('templateSelector');
+    const updateTemplateBtn = document.getElementById('updateTemplateBtn');
     const deleteTemplateBtn = document.getElementById('deleteTemplateBtn');
     const templateNameInput = document.getElementById('templateNameInput');
     const saveNewTemplateBtn = document.getElementById('saveNewTemplateBtn');
@@ -775,6 +776,7 @@ SCHEMA_82.forEach(test => {
             const val = e.target.value;
             if (!val) {
                 if (deleteTemplateBtn) deleteTemplateBtn.classList.add('hidden');
+                if (updateTemplateBtn) updateTemplateBtn.classList.add('hidden');
                 return;
             }
 
@@ -782,8 +784,10 @@ SCHEMA_82.forEach(test => {
                 // Show delete button only if a template is selected (custom templates have numeric IDs)
                 if (!isNaN(Number(val)) && (typeof FIXED_DATA_TEMPLATES === 'undefined' || !FIXED_DATA_TEMPLATES[val])) {
                     deleteTemplateBtn.classList.remove('hidden');
+                    if (updateTemplateBtn) updateTemplateBtn.classList.remove('hidden');
                 } else {
                     deleteTemplateBtn.classList.add('hidden');
+                    if (updateTemplateBtn) updateTemplateBtn.classList.add('hidden');
                 }
             }
 
@@ -802,6 +806,7 @@ SCHEMA_82.forEach(test => {
             if (tmpl.building) buildingInput.value = tmpl.building;
             if (tmpl.sector) sectorInput.value = tmpl.sector;
             if (tmpl.location) locationInput.value = tmpl.location;
+            if (tmpl.comments !== undefined) commentsInput.value = tmpl.comments;
             
             renderInspectionPoints(tmpl.inspections || {});
             renderEvaluations(tmpl.evaluations || {});
@@ -821,15 +826,19 @@ SCHEMA_82.forEach(test => {
                     const extracted = await extractInstrumentsFromExcel(file);
                     if (extracted && extracted.length > 0) {
                         const cur = getInstrumentsData();
-                        if (cur.length > 0) {
-                            if (confirm(`Se detectaron ${extracted.length} instrumentos. ¿Añadir a la lista?`)) {
-                                extracted.forEach(inst => createInstrumentRow(inst));
+                        const newInsts = extracted.filter(e => !cur.some(c => c.name.toLowerCase() === e.name.toLowerCase() && c.serie === e.serie));
+                        
+                        if (newInsts.length > 0) {
+                            if (cur.length > 0) {
+                                if (confirm(`Se detectaron ${newInsts.length} instrumentos nuevos. ¿Añadir a la lista? (Si eliges Cancelar, se reemplazarán los actuales)`)) {
+                                    newInsts.forEach(inst => createInstrumentRow(inst));
+                                } else {
+                                    instrumentsContainer.innerHTML = '';
+                                    extracted.forEach(inst => createInstrumentRow(inst)); // Insertamos todos los extraidos si eligió reemplazar
+                                }
                             } else {
-                                instrumentsContainer.innerHTML = '';
-                                extracted.forEach(inst => createInstrumentRow(inst));
+                                newInsts.forEach(inst => createInstrumentRow(inst));
                             }
-                        } else {
-                            extracted.forEach(inst => createInstrumentRow(inst));
                         }
                     }
                 } catch (err) { console.error("Error extracción:", err); }
@@ -849,6 +858,7 @@ SCHEMA_82.forEach(test => {
             const building = buildingInput.value;
             const sector = sectorInput.value;
             const location = locationInput.value;
+            const comments = commentsInput.value;
 
             const tx = db.transaction('templates', 'readwrite');
             tx.objectStore('templates').add({ 
@@ -862,10 +872,63 @@ SCHEMA_82.forEach(test => {
                 technician,
                 building,
                 sector,
-                location
+                location,
+                comments
             });
             tx.oncomplete = () => { alert('Plantilla guardada con todos los registros actuales'); templateNameInput.value = ''; saveTemplateRow.classList.add('hidden'); loadTemplates(); };
         });
+
+        if (updateTemplateBtn) {
+            updateTemplateBtn.addEventListener('click', async () => {
+                const val = templateSelector.value;
+                if (!val || isNaN(Number(val))) return;
+                
+                const tmpl = savedTemplates.find(t => String(t.id) === String(val));
+                if (!tmpl) return;
+
+                if (!confirm(`¿Estás seguro de que deseas actualizar la plantilla "${tmpl.name}" con los datos actuales del formulario?`)) return;
+
+                const inspections = getInspectionsData();
+                const evaluations = getEvaluationsData();
+                const instruments = getInstrumentsData();
+                const brand = brandInput.value;
+                const model = modelInput.value;
+                const technician = technicianInput.value;
+                const building = buildingInput.value;
+                const sector = sectorInput.value;
+                const location = locationInput.value;
+                const comments = commentsInput.value;
+                
+                // Preserve the existing template blob unless the user specifically uploaded a new file right now
+                const file = certFileInput.files[0] || tmpl.blob;
+
+                try {
+                    const tx = db.transaction('templates', 'readwrite');
+                    tx.objectStore('templates').put({ 
+                        id: tmpl.id,
+                        name: tmpl.name, 
+                        blob: file,
+                        inspections,
+                        evaluations,
+                        instruments,
+                        brand,
+                        model,
+                        technician,
+                        building,
+                        sector,
+                        location,
+                        comments
+                    });
+                    tx.oncomplete = () => {
+                        alert(`✅ Plantilla "${tmpl.name}" actualizada correctamente.`);
+                        loadTemplates();
+                    };
+                } catch (err) {
+                    console.error('Error al actualizar plantilla:', err);
+                    alert('Error al actualizar plantilla: ' + err.message);
+                }
+            });
+        }
 
         if (deleteTemplateBtn) {
             deleteTemplateBtn.addEventListener('click', async () => {
@@ -1076,6 +1139,8 @@ SCHEMA_82.forEach(test => {
             const val = (d.evaluations || {})[item.label] || '';
             ws.getCell(`H${item.row}`).value = val === 'P' ? 'x' : (val || 'NA');
         });
+        
+        ws.getCell('A21').value = d.comments ? `Comentarios: ${d.comments}` : '';
 
         // ── 8.1 Inspección (14 ítems) ──
         SCHEMA_81.forEach(item => {
