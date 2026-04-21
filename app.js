@@ -806,8 +806,8 @@ SCHEMA_82.forEach(test => {
             renderInspectionPoints(tmpl.inspections || {});
             renderEvaluations(tmpl.evaluations || {});
 
-            instrumentsContainer.innerHTML = '';
             if (tmpl.instruments && tmpl.instruments.length > 0) {
+                instrumentsContainer.innerHTML = '';
                 tmpl.instruments.forEach(i => createInstrumentRow(i));
             }
         }
@@ -999,7 +999,13 @@ SCHEMA_82.forEach(test => {
             const evaluations = getEvaluationsData();
             const instruments = getInstrumentsData();
             const tmpl = savedTemplates.find(t => String(t.id) === String(templateSelector.value));
+            const existing = calibrationDates[selectedSerieForEdit] || {};
             let blob = certFileInput.files[0] || (tmpl ? tmpl.blob : null);
+
+            // Si no hay nuevo archivo ni plantilla, preservar el existente
+            if (!blob && existing.certificate) {
+                blob = existing.certificate;
+            }
 
             try {
                 let finalCert = blob;
